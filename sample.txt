@@ -19,7 +19,12 @@ def flatten_df(df):
             exploded_df = df.withColumn(column_name, explode_outer(col(column_name)))
             # Flatten the exploded array
             flat_exploded_df = flatten_df(exploded_df)
-            flat_df = flat_df.join(flat_exploded_df, flat_exploded_df.columns[:len(flat_cols)], how='left')
+            
+            # Aggregate the exploded columns back into a list
+            flat_exploded_df = flat_exploded_df.groupBy(*flat_cols).agg(collect_list(struct(*[col(f"{column_name}_{field}") for field in exploded_df.schema[column_name].dataType.elementType.fieldNames()])).alias(column_name))
+            
+            # Join back to the flat DataFrame
+            flat_df = flat_df.join(flat_exploded_df, flat_cols, how='left')
         elif isinstance(df.schema[column_name].dataType, StructType):
             # Flatten the struct column
             struct_cols = [col(f"{column_name}.{field.name}").alias(f"{column_name}_{field.name}") for field in df.schema[column_name].dataType.fields]

@@ -1,13 +1,12 @@
-from pyspark.sql.functions import col, explode_outer, concat_ws, collect_list
-from pyspark.sql.types import ArrayType, StructType
-
 def flatten_df(df):
     flat_cols = []
     nested_cols = []
     
     # Identify flat and nested columns
     for column_name, column_type in df.dtypes:
-        if isinstance(df.schema[column_name].dataType, ArrayType) or isinstance(df.schema[column_name].dataType, StructType):
+        if isinstance(df.schema[column_name].dataType, ArrayType):
+            nested_cols.append((column_name, column_type))
+        elif isinstance(df.schema[column_name].dataType, StructType):
             nested_cols.append((column_name, column_type))
         else:
             flat_cols.append(column_name)
@@ -20,6 +19,7 @@ def flatten_df(df):
         if isinstance(df.schema[column_name].dataType, ArrayType):
             # Explode the array column
             exploded_df = df.withColumn(column_name, explode_outer(col(column_name)))
+            
             # Flatten the exploded array
             flat_exploded_df = flatten_df(exploded_df)
             

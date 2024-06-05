@@ -32,12 +32,16 @@ def flatten_df(df):
                 ]
                 flat_exploded_df = flat_exploded_df.groupBy(*flat_cols).agg(*agg_exprs)
             
-            # Join back to the flat DataFrame
+            # Ensure unique column names before joining
+            flat_exploded_df = flat_exploded_df.select([col(c).alias(f"{column_name}_{c}") if c in flat_cols else col(c) for c in flat_exploded_df.columns])
             flat_df = flat_df.join(flat_exploded_df, flat_cols, how='left')
         elif col_type == "struct":
             # Flatten the struct column
             struct_cols = [col(f"{column_name}.{field.name}").alias(f"{column_name}_{field.name}") for field in df.schema[column_name].dataType.fields]
             struct_df = df.select(*flat_cols, *struct_cols)
+            
+            # Ensure unique column names before joining
+            struct_df = struct_df.select([col(c).alias(f"{column_name}_{c}") if c in flat_cols else col(c) for c in struct_df.columns])
             flat_df = flat_df.join(struct_df, flat_cols, how='left')
     
     return flat_df
@@ -47,6 +51,3 @@ df_flattened = flatten_df(df)
 
 # Show the resulting DataFrame
 df_flattened.show(truncate=False)
-
-# Stop the Spark session
-spark.stop()

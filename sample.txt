@@ -20,8 +20,12 @@ def flatten_df(df):
             # Flatten the exploded array
             flat_exploded_df = flatten_df(exploded_df)
             
-            # Aggregate the exploded columns back into a list
-            flat_exploded_df = flat_exploded_df.groupBy(*flat_cols).agg(collect_list(struct(*[col(f"{column_name}_{field}") for field in exploded_df.schema[column_name].dataType.elementType.fieldNames()])).alias(column_name))
+            # Aggregate the exploded columns back into a comma-separated string
+            agg_exprs = [
+                concat_ws(",", collect_list(col(f"{column_name}_{field}"))).alias(f"{column_name}_{field}")
+                for field in exploded_df.schema[column_name].dataType.elementType.fieldNames()
+            ]
+            flat_exploded_df = flat_exploded_df.groupBy(*flat_cols).agg(*agg_exprs)
             
             # Join back to the flat DataFrame
             flat_df = flat_df.join(flat_exploded_df, flat_cols, how='left')

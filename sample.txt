@@ -1,1 +1,40 @@
-string_df = df.select([col(c).cast("string").alias(c) for c in df.columns]
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, explode, expr
+from pyspark.sql.types import ArrayType, StructType
+
+# Initialize Spark session
+spark = SparkSession.builder.master("local").appName("FlattenDataFrameDynamic").getOrCreate()
+
+# Sample JSON data with an array field
+json_data = [
+    '{"id": 1, "name": "Alice", "details": [{"id": 101, "name": "Detail1", "xyz": "Value1"}, {"id": 102, "name": "Detail2", "xyz": "Value2"}]}',
+    '{"id": 2, "name": "Bob", "details": [{"id": 201, "name": "Detail3", "xyz": "Value3"}]}',
+    '{"id": 3, "name": "Charlie", "details": []}'
+]
+
+# Create DataFrame from JSON strings
+df = spark.read.json(spark.sparkContext.parallelize(json_data))
+
+# Function to flatten DataFrame dynamically
+def flatten_df(df):
+    # Iterate over all columns
+    for column_name, column_type in df.dtypes:
+        if isinstance(df.schema[column_name].dataType, ArrayType) and isinstance(df.schema[column_name].dataType.elementType, StructType):
+            # Explode the array column
+            df = df.withColumn(column_name, explode(column_name))
+            # Flatten the nested fields
+            nested_fields = df.schema[column_name].dataType.names
+            for field in nested_fields:
+                df = df.withColumn(f"{column_name}_{field}", col(f"{column_name}.{field}"))
+            # Drop the original array column
+            df = df.drop(column_name)
+    return df
+
+# Flatten the DataFrame
+df_flattened = flatten_df(df)
+
+# Show the resulting DataFrame
+df_flattened.show(truncate=False)
+
+# Stop the Spark session
+spark.stop()

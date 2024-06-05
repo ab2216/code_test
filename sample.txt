@@ -1,40 +1,41 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, explode, expr
+from pyspark.sql.functions import col, explode
 from pyspark.sql.types import ArrayType, StructType
 
 # Initialize Spark session
 spark = SparkSession.builder.master("local").appName("FlattenDataFrameDynamic").getOrCreate()
 
-# Sample JSON data with an array field
+# Sample JSON data with array and struct fields
 json_data = [
-    '{"id": 1, "name": "Alice", "details": [{"id": 101, "name": "Detail1", "xyz": "Value1"}, {"id": 102, "name": "Detail2", "xyz": "Value2"}]}',
-    '{"id": 2, "name": "Bob", "details": [{"id": 201, "name": "Detail3", "xyz": "Value3"}]}',
-    '{"id": 3, "name": "Charlie", "details": []}'
+    '{"id": 1, "name": "Alice", "details": {"id": 101, "name": "Detail1", "xyz": "Value1"}, "addresses": [{"city": "NY", "zip": "10001"}, {"city": "LA", "zip": "90001"}]}',
+    '{"id": 2, "name": "Bob", "details": {"id": 201, "name": "Detail2", "xyz": "Value2"}, "addresses": [{"city": "SF", "zip": "94101"}]}',
+    '{"id": 3, "name": "Charlie", "details": {"id": 301, "name": "Detail3", "xyz": "Value3"}, "addresses": []}'
 ]
 
 # Create DataFrame from JSON strings
 df = spark.read.json(spark.sparkContext.parallelize(json_data))
 
-# Function to flatten DataFrame dynamically
-def flatten_df(df):
-    # Iterate over all columns
+# Function to recursively flatten DataFrame
+def flatten_df(df, prefix=""):
+    flat_cols = []
     for column_name, column_type in df.dtypes:
+        full_column_name = f"{prefix}.{column_name}" if prefix else column_name
+        
         if isinstance(df.schema[column_name].dataType, ArrayType) and isinstance(df.schema[column_name].dataType.elementType, StructType):
             # Explode the array column
-            df = df.withColumn(column_name, explode(column_name))
+            df = df.withColumn(column_name, explode(col(column_name)))
             # Flatten the nested fields
-            nested_fields = df.schema[column_name].dataType.names
-            for field in nested_fields:
-                df = df.withColumn(f"{column_name}_{field}", col(f"{column_name}.{field}"))
-            # Drop the original array column
+            df = flatten_df(df, column_name)
+        elif isinstance(df.schema[column_name].dataType, StructType):
+            # Flatten the nested struct fields
+            for field in df.schema[column_name].dataType.fields:
+                df = df.withColumn(f"{column_name}_{field.name}", col(f"{column_name}.{field.name}"))
+            # Drop the original struct column
             df = df.drop(column_name)
-    return df
+        else:
+            flat_cols.append(full_column_name)
+    
+    return df.select(*flat_cols)
 
 # Flatten the DataFrame
 df_flattened = flatten_df(df)
-
-# Show the resulting DataFrame
-df_flattened.show(truncate=False)
-
-# Stop the Spark session
-spark.stop()

@@ -1,3 +1,6 @@
+df = spark.read.json(spark.sparkContext.parallelize(json_data))
+
+# Function to recursively flatten DataFrame
 def flatten_df(df):
     flat_cols = []
     nested_cols = []
@@ -51,3 +54,6 @@ df_flattened = flatten_df(df)
 
 # Show the resulting DataFrame
 df_flattened.show(truncate=False)
+
+# Stop the Spark session
+spark.stop()

@@ -1,31 +1,32 @@
-df = spark.read.json(spark.sparkContext.parallelize(json_data))
-
-# Function to recursively flatten DataFrame
 def flatten_df(df):
-    complex_fields = {field.name: field.dataType for field in df.schema.fields if isinstance(field.dataType, (StructType, ArrayType))}
+    flat_cols = []
+    nested_cols = []
     
-    while complex_fields:
-        col_name, data_type = complex_fields.popitem()
-        
-        if isinstance(data_type, ArrayType) and isinstance(data_type.elementType, StructType):
+    # Identify flat and nested columns
+    for column_name, column_type in df.dtypes:
+        if isinstance(df.schema[column_name].dataType, ArrayType) or isinstance(df.schema[column_name].dataType, StructType):
+            nested_cols.append((column_name, column_type))
+        else:
+            flat_cols.append(column_name)
+    
+    # Select flat columns
+    flat_df = df.select(*flat_cols)
+    
+    # Handle nested columns
+    for column_name, column_type in nested_cols:
+        if isinstance(df.schema[column_name].dataType, ArrayType):
             # Explode the array column
-            df = df.withColumn(col_name, explode(col_name))
-            # Add nested struct fields to the list of fields to process
-            for field in data_type.elementType.fields:
-                df = df.withColumn(f"{col_name}_{field.name}", col(f"{col_name}.{field.name}"))
-            # Drop the original array column
-            df = df.drop(col_name)
-        elif isinstance(data_type, StructType):
-            # Add nested struct fields to the list of fields to process
-            for field in data_type.fields:
-                df = df.withColumn(f"{col_name}_{field.name}", col(f"{col_name}.{field.name}"))
-            # Drop the original struct column
-            df = df.drop(col_name)
+            exploded_df = df.withColumn(column_name, explode_outer(col(column_name)))
+            # Flatten the exploded array
+            flat_exploded_df = flatten_df(exploded_df)
+            flat_df = flat_df.join(flat_exploded_df, flat_exploded_df.columns[:len(flat_cols)], how='left')
+        elif isinstance(df.schema[column_name].dataType, StructType):
+            # Flatten the struct column
+            struct_cols = [col(f"{column_name}.{field.name}").alias(f"{column_name}_{field.name}") for field in df.schema[column_name].dataType.fields]
+            struct_df = df.select(*flat_cols, *struct_cols)
+            flat_df = flat_df.join(struct_df, flat_cols, how='left')
     
-        # Update complex fields
-        complex_fields.update({field.name: field.dataType for field in df.schema.fields if isinstance(field.dataType, (StructType, ArrayType))})
-    
-    return df
+    return flat_df
 
 # Flatten the DataFrame
 df_flattened = flatten_df(df)

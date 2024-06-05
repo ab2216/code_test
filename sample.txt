@@ -5,9 +5,9 @@ def flatten_df(df):
     # Identify flat and nested columns
     for column_name, column_type in df.dtypes:
         if isinstance(df.schema[column_name].dataType, ArrayType):
-            nested_cols.append((column_name, column_type))
+            nested_cols.append((column_name, "array"))
         elif isinstance(df.schema[column_name].dataType, StructType):
-            nested_cols.append((column_name, column_type))
+            nested_cols.append((column_name, "struct"))
         else:
             flat_cols.append(column_name)
     
@@ -15,8 +15,8 @@ def flatten_df(df):
     flat_df = df.select(*flat_cols)
     
     # Handle nested columns
-    for column_name, column_type in nested_cols:
-        if isinstance(df.schema[column_name].dataType, ArrayType):
+    for column_name, col_type in nested_cols:
+        if col_type == "array":
             # Explode the array column
             exploded_df = df.withColumn(column_name, explode_outer(col(column_name)))
             
@@ -24,15 +24,17 @@ def flatten_df(df):
             flat_exploded_df = flatten_df(exploded_df)
             
             # Aggregate the exploded columns back into a comma-separated string
-            agg_exprs = [
-                concat_ws(",", collect_list(col(f"{column_name}_{field}"))).alias(f"{column_name}_{field}")
-                for field in exploded_df.schema[column_name].dataType.elementType.fieldNames()
-            ]
-            flat_exploded_df = flat_exploded_df.groupBy(*flat_cols).agg(*agg_exprs)
+            element_type = df.schema[column_name].dataType.elementType
+            if isinstance(element_type, StructType):
+                agg_exprs = [
+                    concat_ws(",", collect_list(col(f"{column_name}_{field.name}"))).alias(f"{column_name}_{field.name}")
+                    for field in element_type.fields
+                ]
+                flat_exploded_df = flat_exploded_df.groupBy(*flat_cols).agg(*agg_exprs)
             
             # Join back to the flat DataFrame
             flat_df = flat_df.join(flat_exploded_df, flat_cols, how='left')
-        elif isinstance(df.schema[column_name].dataType, StructType):
+        elif col_type == "struct":
             # Flatten the struct column
             struct_cols = [col(f"{column_name}.{field.name}").alias(f"{column_name}_{field.name}") for field in df.schema[column_name].dataType.fields]
             struct_df = df.select(*flat_cols, *struct_cols)
@@ -45,3 +47,6 @@ df_flattened = flatten_df(df)
 
 # Show the resulting DataFrame
 df_flattened.show(truncate=False)
+
+# Stop the Spark session
+spark.stop()

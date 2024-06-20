@@ -1,4 +1,12 @@
-create_table_script = spark.sql(f"SHOW CREATE TABLE {database_name}.{table_name}").collect()[0][0]
-
-# Print the CREATE TABLE script
-print(create_table_script)
+WITH RandomRows AS (
+    SELECT 
+        ATTRIBUTE_ID,
+        ROW_NUMBER() OVER (ORDER BY RANDOM()) AS rn
+    FROM 
+        frtb_latest.fpav_attribute_map
+)
+UPDATE frtb_latest.fpav_attribute_map
+SET EBA_PNL_CATEGORY = 'PC1'
+FROM RandomRows
+WHERE frtb_latest.fpav_attribute_map.ATTRIBUTE_ID = RandomRows.ATTRIBUTE_ID
+AND RandomRows.rn <= 179;

@@ -1,11 +1,12 @@
-UPDATE frtb_latest.fpav_attribute_map
+UPDATE fpav_attribute_map
 SET EBA_PNL_CATEGORY = 'PC1'
-WHERE ATTRIBUTE_ID IN (
-    SELECT ATTRIBUTE_ID 
+WHERE EBA_PNL_CATEGORY IS NULL
+AND ID IN (
+    SELECT ID
     FROM (
-        SELECT ATTRIBUTE_ID
-        FROM frtb_latest.fpav_attribute_map
-        ORDER BY RANDOM()
-        LIMIT 179
-    ) subquery
+        SELECT ID, ROW_NUMBER() OVER (ORDER BY ID) AS rn
+        FROM fpav_attribute_map
+        WHERE EBA_PNL_CATEGORY IS NULL
+    ) AS sub
+    WHERE rn <= 17
 );

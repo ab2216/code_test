@@ -1,12 +1,11 @@
-WITH RandomRows AS (
-    SELECT 
-        ATTRIBUTE_ID,
-        ROW_NUMBER() OVER (ORDER BY RANDOM()) AS rn
-    FROM 
-        frtb_latest.fpav_attribute_map
-)
 UPDATE frtb_latest.fpav_attribute_map
 SET EBA_PNL_CATEGORY = 'PC1'
-FROM RandomRows
-WHERE frtb_latest.fpav_attribute_map.ATTRIBUTE_ID = RandomRows.ATTRIBUTE_ID
-AND RandomRows.rn <= 179;
+WHERE ATTRIBUTE_ID IN (
+    SELECT ATTRIBUTE_ID 
+    FROM (
+        SELECT ATTRIBUTE_ID
+        FROM frtb_latest.fpav_attribute_map
+        ORDER BY RANDOM()
+        LIMIT 179
+    ) subquery
+);

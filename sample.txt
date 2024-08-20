@@ -1,89 +1,46 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, sum as _sum
-
-# Assuming you've already created Spark DataFrames for the tables:
-# df_t0_pnl_summary, df_t1_pnl_summary, df_t3_pnl_summary, df_t4_pnl_summary, and df_book_hierarchy
-
-# Step 1: Select and Union DataFrames
-
-# Selecting columns from t0
-df_t0 = df_t0_pnl_summary.select(
-    "reporting_date", "subdesk_id", "subdesk_name", "legal_entity_id",
-    "pnl_node", "measure", "t0_pnl_usd",
-    lit(0).alias("t1_pnl_usd"), 
-    lit(0).alias("t0_t1_pnl_var_usd"),
-    "control_process_id", "created_timestamp"
-)
-
-# Selecting columns from t1
-df_t1 = df_t1_pnl_summary.select(
-    "reporting_date", "subdesk_id", "subdesk_name", "legal_entity_id",
-    "pnl_node", "measure", 
-    lit(0).alias("t0_pnl_usd"),
-    "t1_pnl_usd", 
-    "valueUSDFinanceFinalVariances".alias("t0_t1_pnl_var_usd"),
-    "control_process_id", "created_timestamp"
-)
-
-# Selecting columns from t3
-df_t3 = df_t3_pnl_summary.select(
-    "reporting_date", "subdesk_id", "subdesk_name", "legal_entity_id",
-    "pnl_node", "measure", 
-    lit(0).alias("t0_pnl_usd"),
-    "t1_pnl_usd", 
-    lit(0).alias("t0_t1_pnl_var_usd"),
-    "control_process_id", "created_timestamp"
-)
-
-# Selecting columns from t4
-df_t4 = df_t4_pnl_summary.select(
-    "reporting_date", "subdesk_id", "subdesk_name", "legal_entity_id",
-    "pnl_node", "measure", 
-    lit(0).alias("t0_pnl_usd"),
-    "t1_pnl_usd", 
-    "valueUSDFinanceFinalVariances".alias("t0_t1_pnl_var_usd"),
-    "control_process_id", "created_timestamp"
-)
-
-# Union all DataFrames
-df_combined_pnl = df_t0.union(df_t1).union(df_t3).union(df_t4)
-
-# Step 2: Perform Group By and Aggregation
-df_final = df_combined_pnl.groupBy(
-    "reporting_date", "subdesk_id", "subdesk_name", "legal_entity_id",
-    "pnl_node", "measure", "control_process_id", "created_timestamp"
-).agg(
-    _sum("t0_pnl_usd").alias("t0_pnl_usd"),
-    _sum("t1_pnl_usd").alias("t1_pnl_usd"),
-    _sum("t0_t1_pnl_var_usd").alias("t0_t1_pnl_var_usd")
-)
-
-# Step 3: Left Outer Join with Book Hierarchy
-df_result = df_final.join(
+df_joined_and_aggregated = df_combined_pnl.join(
     df_book_hierarchy,
-    (df_final["reporting_date"] == df_book_hierarchy["reporting_date"]) &
-    (df_final["subdesk_id"] == df_book_hierarchy["SUBDESK_ID"]) &
-    (df_final["subdesk_name"] == df_book_hierarchy["SUBDESK_NAME"]),
+    (df_combined_pnl["reporting_date"] == df_book_hierarchy["reporting_date"]) &
+    (df_combined_pnl["subdesk_id"] == df_book_hierarchy["SUBDESK_ID"]) &
+    (df_combined_pnl["subdesk_name"] == df_book_hierarchy["SUBDESK_NAME"]),
     "left_outer"
-).select(
-    df_final["reporting_date"],
-    lit(None).alias("unit_name"),  # Assuming this is currently not available in the hierarchy
+).groupBy(
+    df_combined_pnl["reporting_date"],
+    df_combined_pnl["subdesk_id"],
+    df_combined_pnl["subdesk_name"],
+    df_combined_pnl["legal_entity_id"],
+    df_combined_pnl["pnl_node"],
+    df_combined_pnl["measure"],
+    df_combined_pnl["control_process_id"],
+    df_combined_pnl["created_timestamp"],
     df_book_hierarchy["area_name"],
     df_book_hierarchy["sector_name"],
     df_book_hierarchy["segment_name"],
     df_book_hierarchy["function_name"],
     df_book_hierarchy["desk_name"],
-    df_final["subdesk_id"],
-    df_final["subdesk_name"],
-    df_final["legal_entity_id"],
-    df_final["pnl_node"],
-    df_final["measure"],
-    df_final["t0_pnl_usd"],
-    df_final["t1_pnl_usd"],
-    df_final["t0_t1_pnl_var_usd"],
-    df_final["control_process_id"],
-    df_final["created_timestamp"]
+    lit(None).cast(StringType()).alias("unit_name")  # NULL as String type
+).agg(
+    _sum("t0_pnl_usd").alias("t0_pnl_usd"),
+    _sum("t0_pnl").alias("t0_pnl"),  # Aggregate t0_pnl
+    _sum("t1_pnl_usd").alias("t1_pnl_usd"),
+    _sum("t0_t1_pnl_var_usd").alias("t0_t1_pnl_var_usd")
+).select(
+    "reporting_date",
+    "subdesk_id",
+    "subdesk_name",
+    "legal_entity_id",
+    "pnl_node",
+    "measure",
+    "t0_pnl_usd",
+    "t0_pnl",
+    "t1_pnl_usd",
+    "t0_t1_pnl_var_usd",
+    "control_process_id",
+    "created_timestamp",
+    "area_name",
+    "sector_name",
+    "segment_name",
+    "function_name",
+    "desk_name",
+    "unit_name"
 )
-
-# Step 4: Show or Save the Result
-df_result.show()  # or df_result.write.sav

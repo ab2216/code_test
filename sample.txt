@@ -1,19 +1,11 @@
-from pyspark.sql import SparkSession, functions as F
-from com.databricks.dbutils_v1.DBUtilsHolder import dbutils
+from pyspark.sql import functions as F
 
-def getBookHierarchyDataFrame():
-    storageAccountName = dbutils.secrets.get(scope="megdp-keyvault", key="CUMULUS-DATALAKE-NAME")
-
-    setSessionSettingForExternalDatasets(storageAccountName)
-    spark.conf.set("spark.databricks.delta.merge.joinBasedMerge.enabled", "true")
-    
-    unfilteredDF = spark.read.format("delta").load("abfss://booke@" + storageAccountName + ".dfs.core.windows.net/hierarchy")
-    
-    maxASofDate = unfilteredDF.select(F.max(F.col("ASofDate"))).collect()[0][0].date()
-    asoDateDF = unfilteredDF.where(F.col("ASofDate") == maxASofDate)
-    
-    maxCumulus = asoDateDF.select(F.max(F.col("cumulus_rec_timestamp"))).collect()[0][0].timestamp()
-    
-    asoDateDF = asoDateDF.where((F.col("cumulus_rec_timestamp") == maxCumulus) | (F.col("cumulus_rec_timestamp") == ""))
-
-    return asoDateDF
+df = df.withColumn(
+    "concatenated_column",
+    F.concat_ws(
+        "/", 
+        F.coalesce(F.col("column1"), F.lit("")),  # Replace NULL with empty string
+        F.coalesce(F.col("column2"), F.lit("")),  # Replace NULL with empty string
+        F.coalesce(F.col("column3"), F.lit(""))   # Replace NULL with empty string
+    )
+)

@@ -1,16 +1,23 @@
-from pyspark.sql import functions as F
+import mlflow
+from mlflow.tracking import MlflowClient
 
-# Assuming df is your DataFrame
-# Find the max reporting_date
-max_date = df.agg(F.max("reporting_date")).collect()[0][0]
+# Set up the MLflow client
+client = MlflowClient()
 
-# Filter records for the max reporting_date
-filtered_df = df.filter(df["reporting_date"] == max_date)
+# Replace this with your model's name
+model_name = "your_model_name"
 
-# Find the max timestamp for the filtered records
-max_timestamp = filtered_df.agg(F.max("timestamp")).collect()[0][0]
+# Fetch the latest version of the model (or specify a version number)
+model_version = client.get_latest_versions(model_name, stages=["None", "Staging", "Production"])[0]
 
-# Filter records for the max timestamp
-final_filtered_df = filtered_df.filter(filtered_df["timestamp"] == max_timestamp)
+# Display model information
+print(f"Model Name: {model_name}")
+print(f"Version: {model_version.version}")
+print(f"Stage: {model_version.current_stage}")
+print(f"Description: {model_version.description}")
 
-final_filtered_df.show()
+# Fetch and display model tags
+tags = client.get_model_version_tags(model_name, model_version.version)
+print("Tags:")
+for key, value in tags.items():
+    print(f"{key}: {value}")

@@ -21,3 +21,50 @@ tags = client.get_model_version_tags(model_name, model_version.version)
 print("Tags:")
 for key, value in tags.items():
     print(f"{key}: {value}")
+
+
+
+Retrieve and Save Tags to JSON
+
+
+
+import mlflow
+from mlflow.tracking import MlflowClient
+import json
+
+# Initialize MLflow client
+client = MlflowClient()
+
+# Model information
+model_name = "source_model_name"
+model_version = "1"  # Specify the version you want to pull tags from
+
+# Fetch the tags for the specified model version
+tags = client.get_model_version_tags(model_name, model_version)
+
+# Convert tags dictionary to a JSON file
+tags_json = {k: v for k, v in tags.items()}
+json_file_path = "/dbfs/tmp/model_tags.json"
+
+# Save tags to a JSON file
+with open(json_file_path, "w") as f:
+    json.dump(tags_json, f)
+
+print(f"Tags saved to {json_file_path}")
+
+
+--------Load Tags from JSON and Assign to Another Model
+
+# New model information
+new_model_name = "target_model_name"
+new_model_version = "1"  # Specify the version to assign tags
+
+# Load tags from the JSON file
+with open(json_file_path, "r") as f:
+    tags_to_assign = json.load(f)
+
+# Assign tags to the new model version
+for key, value in tags_to_assign.items():
+    client.set_model_version_tag(new_model_name, new_model_version, key, value)
+
+print(f"Tags assigned to model '{new_model_name}' version {new_model_version}")

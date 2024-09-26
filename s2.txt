@@ -1,0 +1,19 @@
+from datetime import datetime
+
+# Get the date from the widget (assume the widget name is "input_date")
+input_date = dbutils.widgets.get("input_date")  # e.g., "2023-09-25"
+
+# Convert 'YYYY-MM-DD' to 'yyyymmdd'
+formatted_date = datetime.strptime(input_date, "%Y-%m-%d").strftime("%Y%m%d")
+
+# Define the Azure Blob storage path (replace with your actual container and storage details)
+container_path = "wasbs://<container-name>@<storage-account-name>.blob.core.windows.net/<directory-path>"
+
+# Construct the file path with a wildcard pattern to match the files
+file_path = f"{container_path}/*{formatted_date}.txt"
+
+# Read the matching .txt files into a Spark DataFrame
+df = spark.read.text(file_path)
+
+# Show the DataFrame
+df.show()

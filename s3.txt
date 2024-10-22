@@ -1,0 +1,14 @@
+df_ml_t0t1_model_input = df_ml_t0t1_model_input.withColumn(
+    "comment_key",
+    F.concat_ws(
+        "/",
+        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("reporting_date"), "&", "^"), "/", "!")), F.lit("")),
+        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("unit_name"), "&", "^"), "/", "!")), F.lit("")),
+        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("area_name"), "&", "^"), "/", "!")), F.lit("")),
+        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("sector_name"), "&", "^"), "/", "!")), F.lit("")),
+        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("segment_name"), "&", "^"), "/", "!")), F.lit("")),
+        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("function_name"), "&", "^"), "/", "!")), F.lit("")),
+        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("subdesk_name"), "&", "^"), "/", "!")), F.lit("")),
+        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("legal_entity_id"), "&", "^"), "/", "!")), F.lit(""))
+    )
+)

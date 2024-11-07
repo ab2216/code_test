@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Usage: ./script.sh "query1" "query2"
+
+# Input queries
+query1="$1"
+query2="$2"
+
+# Date and timestamp for filename
+timestamp=$(date +"%Y%m%d%H%M%S")
+
+# Output directory for CSV files
+output_dir="/path/to/output"
+mkdir -p "$output_dir"
+
+# Generate CSV files with timestamp
+csv_file1="${output_dir}/query1_partA_${timestamp}.csv"
+csv_file2="${output_dir}/query2_partB_${timestamp}.csv"
+
+# Run queries in Impala and export to CSV
+impala-shell -d my_database -q "$query1" -B --output_delimiter="," --print_header > "$csv_file1"
+impala-shell -d my_database -q "$query2" -B --output_delimiter="," --print_header > "$csv_file2"
+
+# Zip the generated CSV files
+zip_file="${output_dir}/queries_${timestamp}.zip"
+zip -j "$zip_file" "$csv_file1" "$csv_file2"
+
+# Clean up individual CSV files after zipping
+rm "$csv_file1" "$csv_file2"
+
+echo "CSV files generated and zipped at $zip_file"

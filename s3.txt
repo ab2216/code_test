@@ -1,14 +1,16 @@
-df_ml_t0t1_model_input = df_ml_t0t1_model_input.withColumn(
-    "comment_key",
-    F.concat_ws(
-        "/",
-        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("reporting_date"), "&", "^"), "/", "!")), F.lit("")),
-        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("unit_name"), "&", "^"), "/", "!")), F.lit("")),
-        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("area_name"), "&", "^"), "/", "!")), F.lit("")),
-        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("sector_name"), "&", "^"), "/", "!")), F.lit("")),
-        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("segment_name"), "&", "^"), "/", "!")), F.lit("")),
-        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("function_name"), "&", "^"), "/", "!")), F.lit("")),
-        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("subdesk_name"), "&", "^"), "/", "!")), F.lit("")),
-        F.coalesce(F.trim(F.regexp_replace(F.regexp_replace(F.col("legal_entity_id"), "&", "^"), "/", "!")), F.lit(""))
-    )
-)
+def convert_decimals_to_string(df):
+    for column in df.schema.fields:
+        if isinstance(column.dataType, DecimalType):
+            df = df.withColumn(
+                column.name,
+                expr(f"""
+                    CASE
+                        WHEN {column.name} = 0 THEN '0'
+                        ELSE TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM CAST({column.name} AS STRING)))
+                    END
+                """)
+            )
+    return df
+
+# Apply the function
+converted_df = convert_decimals_to_string(df)
